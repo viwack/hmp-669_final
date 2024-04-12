@@ -1,0 +1,224 @@
+---
+title: "Financial Viability Analysis"
+author: "Vicky Wang (viwa)"
+date: "2024-04-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# install these packages if you don't have them already installed
+library(ggplot2)
+library(dplyr)
+library(plyr)
+library(reshape2)
+library(knitr)
+library(binom) 
+library(purrr)
+library(forcats)
+library(tidyr)
+library(stringr)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+dx11 <- read.csv("9DX11.csv")
+op11 <- read.csv("9OP11.csv")
+crit <- read.csv("CRIT.csv")
+dispostn <- read.csv("DISPOSTN.csv")
+drg <- read.csv("DRG.csv")
+ome_dx <- read.csv("OME_DX.csv")
+ome_px <- read.csv("OME_PX.csv")
+omega <- read.csv("OMEGA.csv")
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# this code chunk is designed to clean the dx11 data set so it can be usable in R
+# filters out any rows with nothing in it-- this happens when exporting the accb into .csv
+dx11 <- dx11 %>% 
+  rowwise() %>% 
+  mutate(count_separators = str_count(ALL, fixed("|"))) %>% 
+  ungroup() %>% 
+  filter(count_separators != 0)
+
+dx11 <- dx11 %>%
+  mutate(ALL = str_trim(ALL)) %>%  # Trim leading and trailing white spaces
+  mutate(ALL = str_remove(ALL, "^\\|")) %>%  # Remove leading pipe if present
+  mutate(ALL = str_remove(ALL, "\\|$")) %>%  # Remove trailing pipe if present
+  separate(ALL, 
+           into = c("DIAG", "DIAG_DESC", "DIAG_C", "DIAG_5"), #new column names
+           sep = " \\| ",   # Assume there's a space before and after each pipe
+           extra = "merge",
+           fill = "right") %>% 
+  mutate(across(starts_with("DIAG"), ~str_trim(.))) %>% # Trim white space from new columns
+  select(DIAG, DIAG_DESC, DIAG_C, DIAG_5) %>% #removes extra info we don't want
+  mutate(DIAG = as.integer(DIAG)) %>% #sets the columns into their relevant type
+  mutate(DIAG_DESC = as.character(DIAG_DESC)) %>%
+  mutate(DIAG_C = as.double(DIAG_C)) %>%
+  mutate(DIAG_5 = as.double(DIAG_5))
+
+dx11 <- dx11[-1, ] #removes the double column names situation
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# this code chunk is designed to clean op11 data set so it is usable in R
+op11 <- op11 %>% 
+  rowwise() %>% 
+  mutate(count_separators = str_count(ALL, fixed("|"))) %>% 
+  ungroup() %>% 
+  filter(count_separators != 0)
+
+op11 <- op11 %>%
+  mutate(ALL = str_trim(ALL)) %>% 
+  mutate(ALL = str_remove(ALL, "^\\|")) %>%
+  mutate(ALL = str_remove(ALL, "\\|$")) %>%
+  separate(ALL, 
+           into = c("OP", "OP_DESC", "OP_C"), 
+           sep = " \\| ",
+           extra = "merge",
+           fill = "right") %>% 
+  mutate(across(starts_with("OP"), ~str_trim(.))) %>%
+  select(OP, OP_DESC, OP_C) %>%
+  mutate(OP = as.double(OP)) %>%
+  mutate(OP_DESC = as.character(OP_DESC)) %>%
+  mutate(OP_C = as.double(OP_C))
+
+op11 <- op11[-1, ]
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# this code chunk is designed to clean crit data set so it is usable in R
+crit <- crit %>% 
+  rowwise() %>% 
+  mutate(count_separators = str_count(ALL, fixed("|"))) %>% 
+  ungroup() %>% 
+  filter(count_separators != 0)
+
+crit <- crit %>%
+  mutate(ALL = str_trim(ALL)) %>% 
+  mutate(ALL = str_remove(ALL, "^\\|")) %>%
+  mutate(ALL = str_remove(ALL, "\\|$")) %>%
+  separate(ALL, 
+           into = c("PAT_NO", "PAT_NO_TAG", "ADM_DATE", "DIS_DATE", "TOT_CCUS", "OCCURRENCE", "ICU", "ICU_LOS"), 
+           sep = " \\| ",
+           extra = "merge",
+           fill = "right") %>% 
+  mutate(across(starts_with("PAT_NO"), ~str_trim(.))) %>%
+  select(PAT_NO, PAT_NO_TAG, ADM_DATE, DIS_DATE, TOT_CCUS, OCCURRENCE, ICU, ICU_LOS)
+
+crit <- crit[-1, ]
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# this code chunk is designed to clean dispostn data set so it is usable in R
+dispostn <- dispostn %>% 
+  rowwise() %>% 
+  mutate(count_separators = str_count(ALL, fixed("|"))) %>% 
+  ungroup() %>% 
+  filter(count_separators != 0)
+
+dispostn <- dispostn %>%
+  mutate(ALL = str_trim(ALL)) %>% 
+  mutate(ALL = str_remove(ALL, "^\\|")) %>%
+  mutate(ALL = str_remove(ALL, "\\|$")) %>%
+  separate(ALL, 
+           into = c("DISPOSTN", "DESCRIPT"), 
+           sep = " \\| ",
+           extra = "merge",
+           fill = "right") %>% 
+  mutate(across(starts_with("DISPOSTN"), ~str_trim(.))) %>%
+  select(DISPOSTN, DESCRIPT)
+
+dispostn <- dispostn[-1, ]
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# this code chunk is designed to clean drg data set so it is usable in R
+drg <- drg %>% 
+  rowwise() %>% 
+  mutate(count_separators = str_count(ALL, fixed("|"))) %>% 
+  ungroup() %>% 
+  filter(count_separators != 0)
+
+drg <- drg %>%
+  mutate(ALL = str_trim(ALL)) %>% 
+  mutate(ALL = str_remove(ALL, "^\\|")) %>%
+  mutate(ALL = str_remove(ALL, "\\|$")) %>%
+  separate(ALL, 
+           into = c("DRG", "MAJ_DX_CAT", "PARTITION", "DESCRIPTOR", "WEIGHT", "ARITH_LOS", "MEAN_LOS", "CUTOFF"), 
+           sep = " \\| ",
+           extra = "merge",
+           fill = "right") %>% 
+  mutate(across(starts_with("DRG"), ~str_trim(.))) %>%
+  select(DRG, MAJ_DX_CAT, PARTITION, DESCRIPTOR, WEIGHT, ARITH_LOS, MEAN_LOS, CUTOFF)
+
+drg <- drg[-1, ]
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# this code chunk is designed to clean ome_dx data set so it is usable in R
+ome_dx <- data.frame(ALL = ome_dx)
+
+ome_dx <- ome_dx[which(nchar(gsub("\\s", "", ome_dx$ALL)) > 0), , drop = FALSE]
+
+# We use the read.table function to separate the ALL column into multiple columns
+ome_dx <- read.table(text = ome_dx$ALL, sep = "\t", header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+ome_px <- data.frame(ALL = ome_px)
+
+ome_px <- ome_px[which(nchar(gsub("\\s", "", ome_px$ALL)) > 0), , drop = FALSE]
+
+# We use the read.table function to separate the ALL column into multiple columns
+ome_px <- read.table(text = ome_px$ALL, sep = "\t", header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# this code chunk is designed to clean drg data set so it is usable in R
+omega <- omega %>% 
+  rowwise() %>% 
+  mutate(count_separators = str_count(ALL, fixed("|"))) %>% 
+  ungroup() %>% 
+  filter(count_separators != 0)
+
+omega <- omega %>%
+  mutate(ALL = str_trim(ALL)) %>% 
+  mutate(ALL = str_remove(ALL, "^\\|")) %>%
+  mutate(ALL = str_remove(ALL, "\\|$")) %>%
+  separate(ALL, 
+           into = c("PAT_NO", "ADM_DATE", "DIS_DATE", "ADM_HR", "ADM_TYPE", "ADM_SOURCE", "ADM_SVC", "ADM_DIAG_9", "ADM_LISTA9", "AGE", "AGE_DAYS", "BIRTH_WGHT", "PCONSULTS", "DCONSULTS", "CCSTAY", "PRINCPL_DX", "AUTOPSY", "CORONER", "DIED_WI_48", "DIED_IN_OR", "DIED_PSTOP", "DOA", "ER_DEATH", "DISPOSTN", "DIS_SVC", "DISTANCE", "PPX_DOP", "WEIGHT", "DRG", "EXT_REV", "LISTA_9", "LISTB_9", "LOS", "LOS_B_SURG", "MORPH_NEO", "MORPH_BEH", "PRINCPL_OP", "PRIM_PAY", "SEC_PAY", "MAJOR_PAY", "PERC90", "PHYS_A_KEY", "PHYS_A_SPC", "PHYS_KEY", "PHYS_SPC", "PREPRC_TST", "RACE", "ELOS_UNTR", "FAM_REF", "OTH_PROVDR", "RELIGION", "SEX", "PPX_SURG", "TEACH_SVC", "TISSUE", "ZIP", "DIS_HOUR", "LOS_HRS", "DSCHG_RESD", "ADDL_SVC", "MOTHER_MRN", "OP_ER_PHYS", "COMP_PAY", "ORGAN_DON", "ORGAN_TYPE", "BILLING_NO", "OUTPT_COST", "ADMT_RESD", "SUPV_RESD", "PAT_TYPE", "TOT_CHARGE", "TOT_PAY", "TOT_COST", "TOT_DIRECT"), 
+           sep = " \\| ",
+           extra = "merge",
+           fill = "right") %>% 
+  mutate(across(starts_with("PAT_NO"), ~str_trim(.)))
+
+omega <- omega[-1, ]
+```
+
+
+```{r checking_if_works}
+head(dx11)
+head(op11)
+head(crit)
+head(dispostn)
+head(drg)
+head(ome_dx)
+head(ome_px)
+head(omega)
+```
+
+**Profitability of patients from Cardiac and Orthopedic services**
+
+
+LOS outlier rates
+
+Payer mix
+
+Rates of emergent vs. elective care
+
+Probable future demand given Omega's patient demographics for Cardiac and Orthopedic services (this is less of a coding/query question, and more of discussing what you can an infer from demographics and trends)
+
+
