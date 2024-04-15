@@ -1,0 +1,23 @@
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+mdc_list <- read.csv("MDC_List.csv")
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+drg <- drg %>%
+  mutate(MAJ_DX_CAT = as.integer(MAJ_DX_CAT))
+
+mdc_list <- mdc_list %>%
+  mutate(MDC = as.integer(MDC))
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+add_mdc <- drg %>%
+  left_join(mdc_list, by = c("MAJ_DX_CAT" = "MDC")) %>%
+  mutate(DRG = as.integer(DRG))
+
+
+find_mdc <- omega %>%
+  left_join(add_mdc, by = c("DRG")) %>%
+  filter(DESCRIPT == "Cardiology" | DESCRIPT == "Orthopedics")
+
+head(find_mdc)
