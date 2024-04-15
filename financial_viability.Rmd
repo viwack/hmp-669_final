@@ -24,14 +24,14 @@ library(stringr)
 ```
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-dx11 <- read.csv("9DX11.csv")
-op11 <- read.csv("9OP11.csv")
-crit <- read.csv("CRIT.csv")
-dispostn <- read.csv("DISPOSTN.csv")
-drg <- read.csv("DRG.csv")
-ome_dx <- read.csv("OME_DX.csv")
-ome_px <- read.csv("OME_PX.csv")
-omega <- read.csv("OMEGA.csv")
+dx11 <- read.csv("9DX11.csv") # read in diagnoses index
+op11 <- read.csv("9OP11.csv") # read in operation index
+crit <- read.csv("CRIT.csv") # read in critical care ICU patient info
+dispostn <- read.csv("DISPOSTN.csv") # read in disposition
+drg <- read.csv("DRG.csv") # read in diagnostic-related groups
+ome_dx <- read.csv("OME_DX.csv") # read in omega diagnostic data
+ome_px <- read.csv("OME_PX.csv") # read in omega procedure data
+omega <- read.csv("OMEGA.csv") # patient encounter data
 ```
 
 ```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
@@ -41,7 +41,7 @@ dx11 <- dx11 %>%
   rowwise() %>% 
   mutate(count_separators = str_count(ALL, fixed("|"))) %>% 
   ungroup() %>% 
-  filter(count_separators != 0)
+  filter(count_separators != 0) # cleans data of empty rows
 
 dx11 <- dx11 %>%
   mutate(ALL = str_trim(ALL)) %>%  # Trim leading and trailing white spaces
@@ -55,9 +55,9 @@ dx11 <- dx11 %>%
   mutate(across(starts_with("DIAG"), ~str_trim(.))) %>% # Trim white space from new columns
   select(DIAG, DIAG_DESC, DIAG_C, DIAG_5) %>% #removes extra info we don't want
   mutate(DIAG = as.integer(DIAG)) %>% #sets the columns into their relevant type
-  mutate(DIAG_DESC = as.character(DIAG_DESC)) %>%
-  mutate(DIAG_C = as.double(DIAG_C)) %>%
-  mutate(DIAG_5 = as.double(DIAG_5))
+  mutate(DIAG_DESC = as.character(DIAG_DESC)) %>% #sets into string
+  mutate(DIAG_C = as.double(DIAG_C)) %>% #sets into number
+  mutate(DIAG_5 = as.double(DIAG_5)) #sets into number
 
 dx11 <- dx11[-1, ] #removes the double column names situation
 ```
@@ -168,6 +168,7 @@ ome_dx <- read.table(text = ome_dx$ALL, sep = "\t", header = TRUE, fill = TRUE, 
 ```
 
 ```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# cleans ome_px so it is usable for R
 ome_px <- data.frame(ALL = ome_px)
 
 ome_px <- ome_px[which(nchar(gsub("\\s", "", ome_px$ALL)) > 0), , drop = FALSE]
@@ -177,13 +178,16 @@ ome_px <- read.table(text = ome_px$ALL, sep = "\t", header = TRUE, fill = TRUE, 
 ```
 
 ```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
-# this code chunk is designed to clean drg data set so it is usable in R
+#removes empty rows in omega
 omega <- omega %>% 
   rowwise() %>% 
   mutate(count_separators = str_count(ALL, fixed("|"))) %>% 
   ungroup() %>% 
   filter(count_separators != 0)
+```
 
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# removes whitespace and separates ALL column into respective table columns. also adjusts variable type from defaulted "string"
 omega <- omega %>%
   mutate(ALL = str_trim(ALL)) %>% 
   mutate(ALL = str_remove(ALL, "^\\|")) %>%
@@ -193,27 +197,200 @@ omega <- omega %>%
            sep = " \\| ",
            extra = "merge",
            fill = "right") %>% 
-  mutate(across(starts_with("PAT_NO"), ~str_trim(.)))
-
+  mutate(across(starts_with("PAT_NO"), ~str_trim(.))) %>%
+  mutate(PAT_NO = as.integer(PAT_NO)) %>%
+  mutate(ADM_HR = as.integer(ADM_HR)) %>%
+  mutate(ADM_SOURCE = as.integer(ADM_SOURCE)) %>%
+  mutate(ADM_DATE = str_trim(ADM_DATE)) %>%
+  mutate(DIS_DATE = str_trim(DIS_DATE)) %>%
+  mutate(ADM_TYPE = str_trim(ADM_TYPE)) %>%
+  mutate(ADM_SVC = as.integer(ADM_SVC)) %>%
+  mutate(ADM_DIAG_9 = as.double(ADM_DIAG_9)) %>%
+  mutate(ADM_LISTA9 = as.integer(ADM_LISTA9)) %>%
+  mutate(AGE = as.integer(AGE)) %>%
+  mutate(AGE_DAYS = as.integer(AGE_DAYS)) %>%
+  mutate(BIRTH_WGHT = as.double(BIRTH_WGHT)) %>%
+  mutate(PCONSULTS = as.integer(PCONSULTS)) %>%
+  mutate(DCONSULTS = as.integer(DCONSULTS)) %>%
+  mutate(CCSTAY = as.integer(CCSTAY)) %>%
+  mutate(PRINCPL_DX = as.double(PRINCPL_DX)) %>%
+  mutate(AUTOPSY = as.integer(AUTOPSY)) %>%
+  mutate(CORONER = as.integer(CORONER)) %>%
+  mutate(DIED_WI_48 = as.integer(DIED_WI_48)) %>%
+  mutate(DIED_IN_OR = as.integer(DIED_IN_OR)) %>%
+  mutate(DIED_PSTOP = as.integer(DIED_PSTOP)) %>%
+  mutate(ER_DEATH = as.integer(ER_DEATH)) %>%
+  mutate(DISPOSTN = as.integer(DISPOSTN)) %>%
+  mutate(DIS_SVC = as.integer(DIS_SVC)) %>%
+  mutate(DISTANCE = as.integer(DISTANCE)) %>%
+  mutate(WEIGHT = as.double(WEIGHT)) %>%
+  mutate(DRG = as.integer(DRG)) %>%
+  mutate(TOT_CHARGE = as.double(TOT_CHARGE)) %>%
+  mutate(TOT_PAY = as.double(TOT_PAY)) %>%
+  mutate(TOT_COST = as.double(TOT_PAY)) %>%
+  mutate(TOT_DIRECT = as.double(TOT_DIRECT))
 omega <- omega[-1, ]
+
+omega <- omega %>% distinct()
 ```
 
 
-```{r checking_if_works}
-head(dx11)
-head(op11)
-head(crit)
-head(dispostn)
-head(drg)
-head(ome_dx)
-head(ome_px)
-head(omega)
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# cleans and reads service so it is usable in r
+service <- read.csv("SERVICE.csv")
+service <- service %>% 
+  rowwise() %>% 
+  mutate(count_separators = str_count(ALL, fixed("|"))) %>% 
+  ungroup() %>% 
+  filter(count_separators != 0)
+
+service <- service %>%
+  mutate(ALL = str_trim(ALL)) %>% 
+  mutate(ALL = str_remove(ALL, "^\\|")) %>%
+  mutate(ALL = str_remove(ALL, "\\|$")) %>%
+  separate(ALL, 
+           into = c("SERVICE", "DESCRIPT"), 
+           sep = " \\| ",
+           extra = "merge",
+           fill = "right") %>% 
+  mutate(across(starts_with("SERVICE"), ~str_trim(.)))
+service <- service[-1, ]
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# writing new files that look way better for analysis in r
+write.csv(dx11, file = "9dx11_new.csv", row.names = FALSE)
+write.csv(op11, file = "9op11_new.csv", row.names = FALSE)
+write.csv(crit, file = "crit_new.csv", row.names = FALSE)
+write.csv(dispostn, file = "dispostn_new.csv", row.names = FALSE)
+write.csv(drg, file = "drg_new.csv", row.names = FALSE)
+write.csv(ome_dx, file = "ome_dx_new.csv", row.names = FALSE)
+write.csv(ome_px, file = "ome_px_new.csv", row.names = FALSE)
+write.csv(omega, file = "omega_new.csv", row.names = FALSE)
+write.csv(service, file = "service_new.csv", row.names = FALSE)
+```
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+mdc_list <- read.csv("MDC_List.csv") # read in major diagnostic groups file that has been exported to csv form
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+drg <- drg %>%
+  mutate(MAJ_DX_CAT = as.integer(MAJ_DX_CAT)) #makes maj_dx_cat an integer
+
+mdc_list <- mdc_list %>%
+  mutate(MDC = as.integer(MDC)) #makes MDC an integer
+```
+
+```{r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+add_mdc <- drg %>%
+  left_join(mdc_list, by = c("MAJ_DX_CAT" = "MDC")) %>%
+  mutate(DRG = as.integer(DRG)) #joins the mdc_list to drg using MAJ_DX_CAT
+
+
+find_mdc <- omega %>%
+  left_join(add_mdc, by = c("DRG"))
+
+filter_services <- find_mdc %>%
+  filter(DESCRIPT == "Cardiology" | DESCRIPT == "Orthopedics") #joins mdc to omega using DRG and also filters to services of interest
+
+```
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+write.csv(find_mdc, file = "omega-card-ortho_filtered.csv", row.names = FALSE)
+```
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+profit <- find_mdc %>%
+  filter(DESCRIPT != "" & trimws(DESCRIPT) != "") %>%
+  mutate(SERVICE_TYPE = case_when(
+    DESCRIPT == "Cardiology" ~ "Cardio",
+    DESCRIPT == "Orthopedic" ~ "Ortho",
+    TRUE ~ "Other"
+  ))
+
+library(dplyr)
+
 ```
 
 **Profitability of patients from Cardiac and Orthopedic services**
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+#USING GROSS MARGIN CALCULATIONS TO ASSESS PROFITABILITY: TOTAL PAID - ALL DIRECT COSTS / DIRECT COST
+# Nguyễn, H. N. (2010). Marketing Metrics The Definitive Guide to Measuring Marketing Performance (2nd Edition)-Pearson Prentice Hall (2010). Prentice Hall. https://www.academia.edu/81941821/Marketing_Metrics_The_Definitive_Guide_to_Measuring_Marketing_Performance_2nd_Edition_Pearson_Prentice_Hall_2010_
+
+# Calculate the averages by service type
+service_type_averages <- find_mdc %>%
+  filter(DESCRIPT != "" & trimws(DESCRIPT) != "") %>%
+  mutate(SERVICE_TYPE = case_when(
+    DESCRIPT == "Cardiology" ~ "Cardio",
+    DESCRIPT == "Orthopedic" ~ "Ortho",
+    TRUE ~ "Other"))
+
+summary_gross_margin <- service_type_averages %>%
+  dplyr::group_by(SERVICE_TYPE) %>%
+  dplyr::summarise(
+    AVG_PAY = mean(TOT_PAY),
+    AVG_DIRECT = mean(TOT_DIRECT)
+  ) %>%
+  mutate(AVG_GROSS_MARGIN = (AVG_PAY - AVG_DIRECT) / AVG_DIRECT)
+```
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+summary_gross_margin %>%
+  ggplot(mapping = aes(x = SERVICE_TYPE, y = AVG_GROSS_MARGIN)) +
+  geom_bar(stat = "identity", fill = "darkorange2") + ggtitle("Gross Margin by Service Type") + xlab("Type of Service") + ylab("Average Gross Margin")
+```
+
+**LOS Outliers**
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+profit <- profit %>%
+  mutate(LOS = as.integer(LOS))
 
 
-LOS outlier rates
+IQR_values <- profit %>%
+  filter(!is.na(LOS)) %>% # filter out missing LOS values
+  summarize(
+    Q1 = quantile(LOS, 0.25, na.rm = TRUE),
+    Q3 = quantile(LOS, 0.75, na.rm = TRUE),
+    IQR = IQR(LOS, na.rm = TRUE)
+  ) %>%
+  mutate(
+    lower_bound = Q1 - 1.5 * IQR,
+    upper_bound = Q3 + 1.5 * IQR
+  ) %>%
+  {list(lower = .$lower_bound, upper = .$upper_bound)}
+
+# Identify outliers and create a new column 'Outlier'
+profit <- profit %>%
+  mutate(
+    Outlier = case_when(
+      LOS < IQR_values$lower | LOS > IQR_values$upper ~ "Outlier",
+      TRUE ~ "Not Outlier"
+    )
+  )
+
+# Create your ggplot
+p <- ggplot(profit, aes(x = SERVICE_TYPE, y = LOS, color = Outlier)) +
+  geom_point(trim = FALSE) +  # Create the violin plot
+  geom_jitter(width = 0.2) +  # Add points with a slight horizontal "jitter" to enhance visibility
+  labs(x = "Service Type", y = "Length of Stay (LOS)") + ggtitle("Length of Stay vs Service Type (Blue Denotes Outlier)") +
+  theme_minimal() +
+  theme(legend.position = "none") +  # Remove the legend if color by group is not necessary
+  scale_color_brewer(palette = "Set1") # Use a color palette for distinction
+
+# Print the plot
+print(p)
+
+```
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+outliers_los <- profit %>%
+  dplyr::group_by(SERVICE_TYPE) %>%
+  filter(Outlier == "Outlier") %>%
+  dplyr::summarise(num_outliers = n(), .groups = "drop") %>% # Use n() to count rows in the filtered group
+  kable(col.names = c("Type of Service", "Number of Length of Stay Outliers"))
+outliers_los
+
+```
 
 Payer mix
 
