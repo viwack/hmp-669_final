@@ -1,6 +1,6 @@
 ---
 title: "Cleaned Tables of OMEGA Databse"
-author: "Vicky Wang (viwa)"
+author: "Vicky Y. Wang (viwa)"
 date: "2024-04-12"
 output: html_document
 ---
