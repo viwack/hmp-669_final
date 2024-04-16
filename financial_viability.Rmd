@@ -21,6 +21,7 @@ library(purrr)
 library(forcats)
 library(tidyr)
 library(stringr)
+library(scales)
 ```
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
@@ -304,8 +305,8 @@ write.csv(find_mdc, file = "omega-card-ortho_filtered.csv", row.names = FALSE)
 profit <- find_mdc %>%
   filter(DESCRIPT != "" & trimws(DESCRIPT) != "") %>%
   mutate(SERVICE_TYPE = case_when(
-    DESCRIPT == "Cardiology" ~ "Cardio",
-    DESCRIPT == "Orthopedic" ~ "Ortho",
+    DESCRIPT == "Cardiology" ~ "Cardiology",
+    DESCRIPT == "Orthopedic" ~ "Orthopedics",
     TRUE ~ "Other"
   ))
 
@@ -322,8 +323,8 @@ library(dplyr)
 service_type_averages <- find_mdc %>%
   filter(DESCRIPT != "" & trimws(DESCRIPT) != "") %>%
   mutate(SERVICE_TYPE = case_when(
-    DESCRIPT == "Cardiology" ~ "Cardio",
-    DESCRIPT == "Orthopedic" ~ "Ortho",
+    DESCRIPT == "Cardiology" ~ "Cardiology",
+    DESCRIPT == "Orthopedic" ~ "Orthopedics",
     TRUE ~ "Other"))
 
 summary_gross_margin <- service_type_averages %>%
@@ -332,16 +333,28 @@ summary_gross_margin <- service_type_averages %>%
     AVG_PAY = mean(TOT_PAY),
     AVG_DIRECT = mean(TOT_DIRECT)
   ) %>%
-  mutate(AVG_GROSS_MARGIN = (AVG_PAY - AVG_DIRECT) / AVG_DIRECT)
+  mutate(AVG_GROSS_MARGIN = (AVG_PAY - AVG_DIRECT) / AVG_DIRECT) %>%
+  mutate(percentage = AVG_GROSS_MARGIN*100)
 ```
 
+Table of Average Gross Margin, Calculated on Total Pay and Direct Cost Values for each Service Type
 ``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
 summary_gross_margin %>%
-  ggplot(mapping = aes(x = SERVICE_TYPE, y = AVG_GROSS_MARGIN)) +
-  geom_bar(stat = "identity", fill = "darkorange2") + ggtitle("Gross Margin by Service Type") + xlab("Type of Service") + ylab("Average Gross Margin")
+  select(SERVICE_TYPE, percentage) %>%
+  kable(digits = 2, col.names = c("Type of Service", "Average Gross Margin (%)"))
+
 ```
 
+Average Gross Margin by Service Type
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+summary_gross_margin %>%
+  ggplot(mapping = aes(x = SERVICE_TYPE, y = percentage, fill = SERVICE_TYPE)) +
+  geom_bar(stat = "identity") + ggtitle("Gross Margin by Service Type") + xlab("Type of Service") + ylab("Average Gross Margin (%)") + scale_fill_discrete(name = "Service Type")
+```
+
+
 **LOS Outliers**
+Plot of Non-Outliers vs Outliers in Length of Stay by their Service Types
 ``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
 profit <- profit %>%
   mutate(LOS = as.integer(LOS))
@@ -382,20 +395,323 @@ p <- ggplot(profit, aes(x = SERVICE_TYPE, y = LOS, color = Outlier)) +
 print(p)
 
 ```
+
+Table of Proportion of Outliers in Length of Stay for each Service Type
 ``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
 outliers_los <- profit %>%
   dplyr::group_by(SERVICE_TYPE) %>%
+  dplyr::mutate(num_values = n()) %>%
   filter(Outlier == "Outlier") %>%
-  dplyr::summarise(num_outliers = n(), .groups = "drop") %>% # Use n() to count rows in the filtered group
-  kable(col.names = c("Type of Service", "Number of Length of Stay Outliers"))
+  dplyr::mutate(num_outliers = n(), .groups = "drop") %>% # Use n() to count rows in the filtered group
+  dplyr::summarise(prop_outliers = num_outliers/num_values) %>%
+  distinct(SERVICE_TYPE, prop_outliers) %>%
+  kable(digits = 2, col.names = c("Service Type", "Proportion of Outliers per Type"))
+
 outliers_los
 
 ```
 
-Payer mix
+**Payer mix**
 
-Rates of emergent vs. elective care
+1. Pie chart of the overall summary of primary payors, regardless of major diagnostic category group.
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+tot_num_row <- nrow(profit)
 
-Probable future demand given Omega's patient demographics for Cardiac and Orthopedic services (this is less of a coding/query question, and more of discussing what you can an infer from demographics and trends)
+find_pie1 <- profit %>%
+  dplyr::group_by(PRIM_PAY) %>%
+  dplyr::summarise(N_PAYOR = n()) %>%
+  dplyr::mutate(PERCENT_PAYER = N_PAYOR/tot_num_row)
+```
 
 
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+  #group= this will be prim_pay LETTERS[1:5],
+  #this will be percent_payor value=c(13,7,9,21,2)
+
+# Compute the position of labels
+pie_create1 <- find_pie1 %>% 
+  arrange(desc(PRIM_PAY)) %>%
+  mutate(prop = PERCENT_PAYER / sum(find_pie1$PERCENT_PAYER) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+# Basic piechart
+
+# Create a named vector with a color for each level of PRIM_PAY
+custom_colors <- setNames(c("#F8766D", "#B79F00", "#00BA38", "#00BFC4", "#619CFF", "#F564E3"), levels(profit$PRIM_PAY))
+
+# Create a named vector with a new label for each level of PRIM_PAY
+custom_labels <- setNames(c("Blue Cross", "Commercial", "Medicaid", "Medicare", "Private", "Work Comp"), levels(profit$PRIM_PAY))
+
+# Ensure this vector length matches the number of levels
+ggplot(pie_create1, aes(x="", y=prop, fill=PRIM_PAY)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  theme(legend.position="right") +
+  scale_fill_manual(values = custom_colors, labels = custom_labels, name = "Primary Payor (All)") 
+```
+Most patient encounters are paid for by the Blue Cross, Commercial payors, or Medicare. Medicaid represents a smaller proportion, and Private/Work Comp insurers are least frequent.
+
+
+2. Summary of Primary Payors for Cardiology Services
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+tot_num_row <- nrow(profit)
+
+find_pie2 <- profit %>%
+  filter(SERVICE_TYPE == "Cardiology") %>%
+  dplyr::group_by(PRIM_PAY) %>%
+  dplyr::summarise(N_PAYOR = n()) %>%
+  dplyr::mutate(PERCENT_PAYER = N_PAYOR/tot_num_row)
+```
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+  #group= this will be prim_pay LETTERS[1:5],
+  #this will be percent_payor value=c(13,7,9,21,2)
+
+# Compute the position of labels
+pie_create2 <- find_pie2 %>% 
+  arrange(desc(PRIM_PAY)) %>%
+  mutate(prop = PERCENT_PAYER / sum(find_pie2$PERCENT_PAYER) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+# Ensure this vector length matches the number of levels
+ggplot(pie_create2, aes(x="", y=prop, fill=PRIM_PAY)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  theme(legend.position="right") +
+  scale_fill_manual(values = custom_colors, labels = custom_labels, name = "Primary Payor (Cardiology)") 
+```
+Most (50%) cardiology-service patient encounters are paid using Medicare.
+
+3. Summary of Primary Payors for Orthopedics Services.
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+tot_num_row <- nrow(profit)
+
+find_pie3 <- profit %>%
+  filter(SERVICE_TYPE == "Orthopedics") %>%
+  dplyr::group_by(PRIM_PAY) %>%
+  dplyr::summarise(N_PAYOR = n()) %>%
+  dplyr::mutate(PERCENT_PAYER = N_PAYOR/tot_num_row)
+```
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+  #group= this will be prim_pay LETTERS[1:5],
+  #this will be percent_payor value=c(13,7,9,21,2)
+
+# Compute the position of labels
+pie_create3 <- find_pie3 %>% 
+  arrange(desc(PRIM_PAY)) %>%
+  mutate(prop = PERCENT_PAYER / sum(find_pie3$PERCENT_PAYER) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+# Ensure this vector length matches the number of levels
+ggplot(pie_create3, aes(x="", y=prop, fill=PRIM_PAY)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  theme(legend.position="right") +
+  scale_fill_manual(values = custom_colors, labels = custom_labels, name = "Primary Payor (Orthopedic)") 
+```
+
+Most orthopedic-service patient encounters are paid using Medicare.
+
+
+4. Summary of Primary Payors for all Other Services.
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+tot_num_row <- nrow(profit)
+
+find_pie4 <- profit %>%
+  filter(SERVICE_TYPE == "Other") %>%
+  dplyr::group_by(PRIM_PAY) %>%
+  dplyr::summarise(N_PAYOR = n()) %>%
+  dplyr::mutate(PERCENT_PAYER = N_PAYOR/tot_num_row)
+```
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+  #group= this will be prim_pay LETTERS[1:5],
+pie_create4 <- find_pie4 %>% 
+  arrange(desc(PRIM_PAY)) %>%
+  mutate(prop = PERCENT_PAYER / sum(find_pie4$PERCENT_PAYER) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+# Ensure this vector length matches the number of levels
+ggplot(pie_create4, aes(x="", y=prop, fill=PRIM_PAY)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  theme(legend.position="right") +
+  scale_fill_manual(values = custom_colors, labels = custom_labels, name = "Primary Payor (Other)") 
+```
+Most non-cardiology or non-orthopedic services are paid for using commercial insurers.
+
+**Rates of emergent vs. elective care**
+
+Bar Graph of Admission Type, Separated by Service Type 
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+e_care <- profit %>%
+  dplyr::filter(ADM_TYPE %in% c("ELECTIVE", "EMERGENT")) %>%
+  dplyr::group_by(SERVICE_TYPE, ADM_TYPE) %>%
+  dplyr::summarise(num_type = n(), .groups = "keep") %>%
+  dplyr::group_by(SERVICE_TYPE) %>%
+  dplyr::mutate(total_service_type = sum(num_type)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(prop_type = num_type / total_service_type) %>%
+  dplyr::select(SERVICE_TYPE, ADM_TYPE, prop_type)
+
+e_care %>%
+    kable(digits = 3, col.names = c("Service Type", "Type of Care", "Proportion per Type"))
+```
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# Create a named vector with a color for each level of PRIM_PAY
+custom_colors <- setNames(c("#F8766D", "#619CFF"), levels(e_care$ADM_TYPE))
+
+# Create a named vector with a new label for each level of PRIM_PAY
+custom_labels <- setNames(c("Elective", "Emergent"), levels(e_care$ADM_TYPE))
+
+ggplot(e_care, aes(x = SERVICE_TYPE, y = prop_type, fill = ADM_TYPE)) +
+  geom_bar(stat = "identity", position = "stack") +
+  ggtitle("Proportion of Elective vs Emergent Care by Service Type") +
+  xlab("Service Type") +
+  ylab("Proportion") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = custom_colors, labels = custom_labels, name = "Admission Type") 
+
+```
+
+**Probable future demand given Omega's patient demographics for Cardiac and Orthopedic services** 
+(this is less of a coding/query question, and more of discussing what you can an infer from demographics and trends)
+
+Number of Patients, Separated by Age Group and Service Type
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+age_demo <- profit %>%
+  select(PAT_NO, ADM_DATE, AGE, AGE_DAYS, RACE, SEX, SERVICE_TYPE, PRIM_PAY, LOS, TOT_PAY, TOT_CHARGE, TOT_DIRECT, TOT_COST) %>%
+  filter(AGE != "" & trimws(AGE) != "") %>%
+  dplyr::mutate(AGE_GROUP = case_when(
+    AGE_DAYS > 0 ~ "< 2 years",
+    AGE >= 2 & AGE < 18 ~ "2-17 years",
+    AGE >= 18 & AGE <= 34 ~ "18-34 years",
+    AGE >= 35 & AGE <= 44 ~ "35-44 years",
+    AGE >= 45 & AGE <= 54 ~ "45-54 years",
+    AGE >= 55 & AGE <= 64 ~ "55-64 years",
+    AGE >= 65 ~ "65+ years",
+  )) %>%
+  dplyr::group_by(SERVICE_TYPE, AGE_GROUP) %>%
+  dplyr::summarise(num_people = n()) 
+
+custom_colors <- setNames(c("#F8766D", "#619CFF", "#00BA38"), levels(age_demo$SERVICE_TYPE))
+
+# Create a named vector with a new label for each level of PRIM_PAY
+custom_labels <- setNames(c("Cardiology", "Orthopedics", "Other"), levels(age_demo$SERVICE_TYPE))
+
+age_demo %>%
+  ggplot(mapping = aes(x = AGE_GROUP, y = num_people, fill = SERVICE_TYPE)) + geom_bar(stat = "identity") +
+  ggtitle("Number of People per Age Group, by Service Type") + xlab("Age Group") + ylab("Number of Patients") +
+  scale_fill_manual(values = custom_colors, labels = custom_labels, name = "Service Type") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Number of Patients, Separated by Race and Service Type
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+race_demo <- profit %>%
+  filter(RACE != "UNKNOWN") %>%
+  select(PAT_NO, ADM_DATE, AGE, AGE_DAYS, RACE, SEX, SERVICE_TYPE, PRIM_PAY, LOS, TOT_PAY, TOT_CHARGE, TOT_DIRECT, TOT_COST) %>%
+  dplyr::group_by(SERVICE_TYPE, RACE) %>%
+  dplyr::summarise(num_people = n())
+
+custom_colors <- setNames(c("#F8766D", "#619CFF", "#00BA38"), levels(race_demo$SERVICE_TYPE))
+
+# Create a named vector with a new label for each level of PRIM_PAY
+custom_labels <- setNames(c("Cardiology", "Orthopedics", "Other"), levels(race_demo$SERVICE_TYPE))
+
+race_demo %>%
+  ggplot(mapping = aes(x = RACE, y = num_people, fill = SERVICE_TYPE)) + geom_bar(stat = "identity") +
+  ggtitle("Number of People by Race, Separated by Service Type") + xlab("Race") + ylab("Number of Patients") +
+  scale_fill_manual(values = custom_colors, labels = custom_labels, name = "Service Type") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Number of Patients, Separated by Sex and Service Type
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+sex_demo <- profit %>%
+  filter(SEX != "UNKNOWN") %>%
+  select(PAT_NO, ADM_DATE, AGE, AGE_DAYS, RACE, SEX, SERVICE_TYPE, PRIM_PAY, LOS, TOT_PAY, TOT_CHARGE, TOT_DIRECT, TOT_COST) %>%
+  dplyr::group_by(SERVICE_TYPE, SEX) %>%
+  dplyr::summarise(num_people = n())
+
+custom_colors <- setNames(c("#F8766D", "#619CFF", "#00BA38"), levels(sex_demo$SERVICE_TYPE))
+
+# Create a named vector with a new label for each level of PRIM_PAY
+custom_labels <- setNames(c("Cardiology", "Orthopedics", "Other"), levels(sex_demo$SERVICE_TYPE))
+
+sex_demo %>%
+  ggplot(mapping = aes(x = SEX, y = num_people, fill = SERVICE_TYPE)) + geom_bar(stat = "identity") +
+  ggtitle("Number of People by Sex, Separated by Service Type") + xlab("Sex") + ylab("Number of Patients") +
+  scale_fill_manual(values = custom_colors, labels = custom_labels, name = "Service Type") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Number of Patients, Separated by RACE, AGE GROUP, SEX, and Service Type
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+all_demo <- profit %>%
+  filter(RACE != "UNKNOWN" & SEX != "UNKNOWN" & !is.na(AGE)) %>%
+  dplyr::mutate(AGE_GROUP = case_when(
+    AGE_DAYS > 0 ~ "< 2 years",
+    AGE >= 2 & AGE < 18 ~ "2-17 years",
+    AGE >= 18 & AGE <= 34 ~ "18-34 years",
+    AGE >= 35 & AGE <= 44 ~ "35-44 years",
+    AGE >= 45 & AGE <= 54 ~ "45-54 years",
+    AGE >= 55 & AGE <= 64 ~ "55-64 years",
+    AGE >= 65 ~ "65+ years",
+  )) %>%
+  select(PAT_NO, ADM_DATE, AGE_GROUP, RACE, SEX, SERVICE_TYPE, PRIM_PAY, LOS, TOT_PAY, TOT_CHARGE, TOT_DIRECT, TOT_COST) %>%
+  dplyr::group_by(SERVICE_TYPE, RACE, AGE_GROUP, SEX) %>%
+  dplyr::summarise(num_people = n())
+
+custom_colors <- setNames(c("#F8766D", "#619CFF", "#00BA38"), levels(all_demo$SERVICE_TYPE))
+
+# Create a named vector with a new label for each level of PRIM_PAY
+custom_labels <- setNames(c("Cardiology", "Orthopedics", "Other"), levels(all_demo$SERVICE_TYPE))
+
+ggplot(all_demo, aes(x = AGE_GROUP, y = num_people, fill = RACE)) +
+  geom_bar(stat = "identity", position = position_stack()) +
+  facet_grid(SERVICE_TYPE ~ SEX, scales = "free_x", space = "free_x") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.text.x = element_text(angle = 0)) +
+  xlab("Age Group") +
+  ylab("Number of People") +
+  ggtitle("Demographic Distribution by Service Type and Race")
+```
+
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+library(lubridate)  # For easy date manipulation
+```
+
+Number of Patients of each Service Type over Aug 1999 - Dec 2000
+``` {r echo=FALSE, fig.align='center', fig.height=4, fig.width=6, warning=FALSE, dpi=80}
+# Convert ADM_DATE to Date, extract year and month, and calculate monthly patient counts
+# Group by month and service type, then calculate the count
+over_time_patients <- profit %>%
+  mutate(ADM_DATE = as.Date(ADM_DATE, format = "%m/%d/%Y")) %>%
+  mutate(ADM_MONTH = floor_date(ADM_DATE, "month")) %>%  # Creates a monthly date column
+  dplyr::group_by(ADM_MONTH, SERVICE_TYPE) %>%
+  dplyr::summarise(num_patients = n(), .groups = 'drop') %>%
+  arrange(ADM_MONTH, SERVICE_TYPE)
+
+# Plot the total number of patients by month and service type
+ggplot(over_time_patients, aes(x = ADM_MONTH, y = num_patients, group = SERVICE_TYPE, color = SERVICE_TYPE)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Number of Patients Over Time by Service Type",
+       x = "Month",
+       y = "Number of Patients",
+       color = "Service Type") +
+  theme_minimal() +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
