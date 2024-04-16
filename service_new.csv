@@ -1,0 +1,35 @@
+"SERVICE","DESCRIPT","count_separators"
+"                  0","UNKNOWN OR > 255                   ",3
+"                  2","PEDIATRICS                         ",3
+"                 10","INTERNAL MEDICINE                  ",3
+"                 12","ALLERGY                            ",3
+"                 14","CARDIOLOGY                         ",3
+"                 16","DERMATOLOGY                        ",3
+"                 18","ENDOCRINOLOGY                      ",3
+"                 20","GASTROENTEROLOGY                   ",3
+"                 21","INFECTIOUS DISEASE                 ",3
+"                 22","NEPHROLOGY                         ",3
+"                 24","NEUROLOGY                          ",3
+"                 26","ONCOLOGY                           ",3
+"                 28","PHYSICAL MEDICINE                  ",3
+"                 30","PULMONARY MEDICINE                 ",3
+"                 31","RHEUMATOLOGY                       ",3
+"                 36","FAMILY PRACTICE                    ",3
+"                 37","REHABILITATION                     ",3
+"                 38","PSYCHIATRY                         ",3
+"                 40","GENERAL SURGERY                    ",3
+"                 46","THORACIC SURGERY                   ",3
+"                 48","OPHTHALMOLOGY                      ",3
+"                 50","ENT                                ",3
+"                 54","ORAL SURGERY                       ",3
+"                 56","NEUROSURGERY                       ",3
+"                 58","ORTHOPEDICS                        ",3
+"                 60","PLASTIC SURGERY                    ",3
+"                 62","UROLOGY                            ",3
+"                 70","GYNECOLOGY                         ",3
+"                 74","OBSTETRICS                         ",3
+"                 80","NEWBORN                            ",3
+"                110","ANESTHISIOLOGY                     ",3
+"                120","EMERGENCY MEDICINE                 ",3
+"                130","PATHOLOGY                          ",3
+"                140","RADIOLOGY                          ",3
